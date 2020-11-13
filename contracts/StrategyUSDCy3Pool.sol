@@ -89,58 +89,18 @@ contract StrategyUSDCy3Pool is BaseStrategy {
 
         uint256 _balance = gety3poolUSDCBalance();
 
-        if (_balance == 0) {
-            //no position to harvest
-            uint256 wantBalance = want.balanceOf(address(this));
-            if(_debtOutstanding > wantBalance){
-                setReserve(0);
-            }else{
-                setReserve(wantBalance.sub(_debtOutstanding));
-            }
-
-            return 0;
-        }
-
-        if (getReserve() != 0) {
-            //reset reserve so it doesnt interfere anywhere else
-            setReserve(0);
-        }
-
         uint256 balanceInWant = want.balanceOf(address(this));
         uint256 total = _balance.add(balanceInWant);
-
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
         if(total > debt){
             uint profit = total.sub(debt);
             uint amountToFree = profit.add(_debtOutstanding);
-
-            //we need to add outstanding to our profit
-            if(balanceInWant >= amountToFree){
-                setReserve(want.balanceOf(address(this)) - amountToFree);
-            }else{
-                //change profit to what we can withdraw
-                liquidatePosition(amountToFree.sub(balanceInWant));
-                balanceInWant = want.balanceOf(address(this));
-
-                if(balanceInWant > amountToFree){
-                    setReserve(balanceInWant - amountToFree);
-                }else{
-                    setReserve(0);
-                }
-
-            }
-
+            _profit = liquidatePosition(amountToFree.sub(balanceInWant)).sub(_debtOutstanding);
         } else {
-            uint256 bal = want.balanceOf(address(this));
-            if(bal <= _debtOutstanding){
-                setReserve(0);
-            }else{
-                setReserve(bal - _debtOutstanding);
-            }
+            liquidatePosition(_debtOutstanding.sub(balanceInWant));
+            _profit = 0;
         }
-
-        return want.balanceOf(address(this)) - getReserve();
     }
 
     /*
